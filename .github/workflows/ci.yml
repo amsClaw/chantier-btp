@@ -1,0 +1,17 @@
+# Chemin protégé : un ouvrier de l'usine ne peut pas modifier ce fichier.
+name: gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: dépendances
+        run: '[ -f package-lock.json ] && npm ci --no-audit --no-fund || npm install --no-audit --no-fund'
+      - name: tests
+        run: npm test

@@ -1,0 +1,19 @@
+{
+  "produit": "chantier-btp",
+  "tests_requis": true,
+  "typecheck_requis": false,
+  "start": {
+    "commande": "npx --yes serve -l 8080 .",
+    "sante": "http://localhost:8080/",
+    "delai_s": 90
+  },
+  "design": {
+    "bloquant": false,
+    "cibles": [
+      "index.html",
+      "src"
+    ]
+  },
+  "ameliorations": true,
+  "budget_mensuel_usd": 20
+}

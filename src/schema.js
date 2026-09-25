@@ -59,6 +59,34 @@ export const SCHEMA_STATEMENTS = [
      date_transaction TEXT NOT NULL,
      created_at INTEGER NOT NULL
    )`,
+  // Histoire 5 — Facturation, lignes de détail et règlements clients.
+  `CREATE TABLE IF NOT EXISTS factures (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     numero TEXT UNIQUE NOT NULL,
+     chantier_id INTEGER NOT NULL REFERENCES chantiers(id),
+     date_emission TEXT NOT NULL,
+     date_echeance TEXT,
+     statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'partielle', 'soldee')),
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS lignes_facture (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     facture_id INTEGER NOT NULL REFERENCES factures(id),
+     designation TEXT NOT NULL,
+     quantite INTEGER NOT NULL CHECK(quantite > 0),
+     prix_unitaire INTEGER NOT NULL CHECK(prix_unitaire >= 0),
+     total_ligne INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS reglements_facture (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     facture_id INTEGER NOT NULL REFERENCES factures(id),
+     montant INTEGER NOT NULL CHECK(montant > 0),
+     mode_paiement TEXT NOT NULL,
+     date_reglement TEXT NOT NULL,
+     reference TEXT,
+     transaction_caisse_id INTEGER REFERENCES transactions_caisse(id),
+     created_at INTEGER NOT NULL
+   )`,
 ];
 
 /**

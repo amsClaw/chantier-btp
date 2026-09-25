@@ -3,3 +3,11 @@ node_modules/
 *.log
 dist/
 .worktrees/
+
+# Base SQLite locale, recréée au démarrage (DB_PATH).
+data/
+
+# Lockfile volontairement non versionné : il pèse ~2000 lignes, au-delà du
+# plafond de 500 lignes par fichier de l'usine. La CI retombe sur `npm install`
+# quand package-lock.json est absent (cf. .github/workflows/ci.yml).
+package-lock.json

@@ -2,6 +2,7 @@ import express from 'express';
 
 import { createChantiersRouter } from './routes/chantiers.js';
 import { createClientsRouter } from './routes/clients.js';
+import { createStockRouter } from './routes/stock.js';
 import { initSchema } from './schema.js';
 
 /**
@@ -28,6 +29,7 @@ export function createApp({ db } = {}) {
   // Histoires suivantes : ajouter ici le montage de leur routeur, sans toucher
   // aux lignes ci-dessus (src/routes/<domaine>.js).
   app.use('/api/clients', createClientsRouter());
+  app.use('/api', createStockRouter());
   app.use('/api/chantiers', createChantiersRouter());
 
   return app;

@@ -318,6 +318,7 @@ function brancherEvenements() {
     }
     if (cible.dataset.regler) {
       preparerReglement(Number(cible.dataset.regler));
+      ouvrirDialogue('dialogue-reglement');
       return;
     }
     if (cible.dataset.mouvement) {

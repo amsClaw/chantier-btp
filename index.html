@@ -14,6 +14,10 @@
     <p class="bandeau__marque">Chantier BTP</p>
     <h1 class="bandeau__titre" id="titre-vue">Chantiers</h1>
     <p class="bandeau__statut" id="etat-reseau" role="status" aria-live="polite">Prêt</p>
+    <!-- Devise de l'instance : data-devise est substitué par le serveur
+         ({{CURRENCY_SYMBOL}} → valeur de CURRENCY_SYMBOL) et repris par le client au
+         démarrage. Le texte par défaut est le défaut de CURRENCY_SYMBOL (GNF). -->
+    <p class="bandeau__devise" id="devise-app" title="Devise affichée par cette instance" data-devise="{{CURRENCY_SYMBOL}}">GNF</p>
   </header>
   <main id="contenu">
     <!-- Chantiers -->

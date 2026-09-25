@@ -1,9 +1,24 @@
 import { pathToFileURL } from 'node:url';
 
 import { createApp } from './app.js';
+import { PORT_PAR_DEFAUT } from './config.js';
 import { openDatabase } from './db.js';
 
-export const DEFAULT_PORT = 8080;
+export const DEFAULT_PORT = PORT_PAR_DEFAUT;
+
+/**
+ * Port d'écoute retenu : la valeur explicite si elle est fournie (les tests et
+ * `npm run seed` passent 0 pour obtenir un port libre), sinon la variable
+ * d'environnement `PORT`, sinon 8080.
+ *
+ * Une valeur non numérique ou négative est ignorée au profit du défaut : mieux
+ * vaut un serveur qui démarre sur 8080 qu'un processus qui refuse de démarrer.
+ */
+export function resolvePort(port) {
+  if (port !== undefined && port !== null) return port;
+  const valeur = Number(process.env.PORT);
+  return Number.isInteger(valeur) && valeur >= 0 ? valeur : DEFAULT_PORT;
+}
 
 /**
  * Démarre le serveur HTTP.
@@ -16,7 +31,7 @@ export const DEFAULT_PORT = 8080;
  * piloter le cycle de vie sans tuer le processus.
  */
 export function startServer({ port, dbPath } = {}) {
-  const chosenPort = port ?? (Number(process.env.PORT) || DEFAULT_PORT);
+  const chosenPort = resolvePort(port);
 
   const db = openDatabase(dbPath);
   const app = createApp({ db });

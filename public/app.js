@@ -89,7 +89,8 @@ async function soumettre(formulaire, action) {
     bouton.disabled = false;
   }
 }
-const etat = { vue: 'chantiers', clients: [], chantiers: [], articles: [], factures: [], factureOuverte: null };
+const etat = { vue: 'chantiers', clients: [], chantiers: [], articles: [], factures: [], factureOuverte: null, factureDetail: null };
+let auditLigneAvant = null;
 /* --- Navigation entre les onglets ---------------------------------------- */
 function afficherVue(nom) {
   etat.vue = nom;
@@ -175,7 +176,6 @@ async function chargerFactures() {
       <div class="actions">
         <button class="bouton bouton--mini" type="button" data-ouvrir-facture="${facture.id}">Voir / imprimer</button>
         ${facture.reste_a_payer > 0 ? `<button class="bouton bouton--mini bouton--principal" type="button" data-regler="${facture.id}">Encaisser un règlement</button>` : ''}
-        ${facture.montant_regle === 0 ? '<button class="bouton bouton--mini" type="button" data-corriger-facture="' + facture.id + '">Corriger</button>' : ''}
       </div>
     </li>`).join('');
 }
@@ -219,6 +219,7 @@ async function basculerDetailChantier(id) {
 async function ouvrirFacture(id) {
   const facture = await api(`/api/factures/${id}`);
   etat.factureOuverte = facture.id;
+  etat.factureDetail = facture;
   afficherVue('factures');
   $('#facture-detail').hidden = false;
   $('#titre-facture-detail').textContent = `Facture ${facture.numero}`;
@@ -254,6 +255,13 @@ async function ouvrirFacture(id) {
             <li class="carte__meta">${echapper(reglement.date_reglement)} · ${echapper(reglement.mode_paiement)} · <span class="montant">${montant(reglement.montant)}</span>${reglement.reference ? ` — ${echapper(reglement.reference)}` : ''}</li>`).join('')}
         </ul>`}
     </div>
+    ${facture.montant_regle === 0 ? `
+    <div class="facture__bloc no-impression"><h3>Corriger une ligne</h3>
+      <ul class="liste">
+        ${facture.lignes.map((ligne) => `
+          <li class="carte__meta">${echapper(ligne.designation)} — ${ligne.quantite} × ${montant(ligne.prix_unitaire)} <button class="bouton bouton--mini" type="button" data-corriger-ligne="${facture.id}:${ligne.id}">Corriger</button></li>`).join('')}
+      </ul>
+    </div>` : ''}
     <p class="note">Facture acquittée dès règlement intégral du net à payer.</p>`;
 }
 /** Imprime la facture seule (la navigation et les boutons sont masqués par @media print). */
@@ -306,7 +314,7 @@ function brancherEvenements() {
     if (bouton) afficherVue(bouton.dataset.vue);
   });
   document.addEventListener('click', (evenement) => {
-    const cible = evenement.target.closest('[data-ouvrir], [data-fermer], [data-detail-chantier], [data-ouvrir-facture], [data-regler], [data-mouvement], [data-annuler-stock], [data-annuler-caisse], [data-corriger-facture]');
+    const cible = evenement.target.closest('[data-ouvrir], [data-fermer], [data-detail-chantier], [data-ouvrir-facture], [data-regler], [data-mouvement], [data-annuler-stock], [data-annuler-caisse], [data-corriger-ligne]');
     if (!cible) return;
     if (cible.dataset.fermer !== undefined) {
       cible.closest('dialog').close();
@@ -331,7 +339,15 @@ function brancherEvenements() {
     }
     if (cible.dataset.annulerStock) { preparerAudit('stock', cible.dataset.annulerStock, 'Annuler le mouvement'); ouvrirDialogue('dialogue-audit'); return; }
     if (cible.dataset.annulerCaisse) { preparerAudit('caisse', cible.dataset.annulerCaisse, 'Annuler la transaction'); ouvrirDialogue('dialogue-audit'); return; }
-    if (cible.dataset.corrigerFacture) { preparerAudit('facture', cible.dataset.corrigerFacture, 'Corriger la facture'); ouvrirDialogue('dialogue-audit'); return; }
+    if (cible.dataset.corrigerLigne) {
+      const [factureId, ligneId] = cible.dataset.corrigerLigne.split(':').map(Number);
+      const facture = etat.factureDetail && etat.factureDetail.id === factureId ? etat.factureDetail : null;
+      const ligne = facture && facture.lignes ? facture.lignes.find((item) => item.id === ligneId) : null;
+      if (!ligne) { message('Ligne de facture introuvable', 'erreur'); return; }
+      preparerAudit('facture', factureId, `Corriger « ${ligne.designation} »`, ligne);
+      ouvrirDialogue('dialogue-audit');
+      return;
+    }
     if (cible.dataset.ouvrir) {
       const dialogue = cible.dataset.ouvrir;
       if (dialogue === 'dialogue-chantier') preparerChantier();
@@ -360,11 +376,21 @@ async function preparerMouvement(type, articleId) {
   remplirSelect('#mouvement-article', optionsArticles(), { vide: '— choisir un article —', valeurForcee: articleId });
   remplirSelect('#mouvement-chantier', optionsChantiers(), { vide: '— choisir un chantier —' });
 }
-function preparerAudit(domaine, referenceId, titre) {
+function preparerAudit(domaine, referenceId, titre, ligne) {
   $('#audit-domaine').value = domaine;
   $('#audit-reference').value = referenceId;
   $('#audit-motif').value = '';
   $('#titre-audit').textContent = titre;
+  const estFacture = domaine === 'facture';
+  $('#champ-audit-ligne').hidden = !estFacture;
+  $('#audit-ligne-id').value = ligne ? ligne.id : '';
+  $('#audit-designation').value = ligne ? ligne.designation : '';
+  $('#audit-designation').required = estFacture;
+  $('#audit-quantite').value = ligne ? ligne.quantite : '';
+  $('#audit-quantite').required = estFacture;
+  $('#audit-prix-unitaire').value = ligne ? ligne.prix_unitaire : '';
+  $('#audit-prix-unitaire').required = estFacture;
+  auditLigneAvant = ligne || null;
 }
 function preparerTransaction(type) {
   const formulaire = $('#form-transaction');
@@ -508,11 +534,20 @@ export function initialiserInterface() {
       const id = formulaire.elements.reference_id.value;
       const motif = formulaire.elements.motif.value.trim();
       if (domaine === 'facture') {
-        const facture = await api(`/api/factures/${id}`);
-        const ligne = facture.lignes && facture.lignes[0];
-        if (!ligne) throw new Error('Ouvrez la facture pour corriger une ligne');
-        await api(`/api/factures/${id}/lignes/${ligne.id}`, { motif }, 'PATCH');
+        const ligneId = formulaire.elements.ligne_id.value;
+        if (!ligneId || !auditLigneAvant) throw new Error('Ouvrez une facture et choisissez une ligne à corriger');
+        const designation = formulaire.elements.designation.value.trim();
+        const quantite = Number(formulaire.elements.quantite.value);
+        const prixUnitaire = Number(formulaire.elements.prix_unitaire.value);
+        const inchangee = designation === auditLigneAvant.designation
+          && quantite === auditLigneAvant.quantite
+          && prixUnitaire === auditLigneAvant.prix_unitaire;
+        if (inchangee) throw new Error('Aucune valeur modifiée — rien à corriger');
+        await api(`/api/factures/${etat.factureDetail.id}/lignes/${ligneId}`, {
+          designation, quantite, prix_unitaire: prixUnitaire, motif,
+        }, 'PATCH');
         await recharger(['factures']);
+        await ouvrirFacture(etat.factureDetail.id);
       } else {
         await api(`/api/${domaine === 'stock' ? 'stock/mouvements' : 'caisse/transactions'}/${id}/annuler`, { motif });
         await recharger([domaine]);

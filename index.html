@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title>Chantier BTP — stock, caisse et factures</title>
+  <link rel="stylesheet" href="public/styles.css">
+</head>
+<body>
+  <a class="lien-evitement" href="#contenu">Aller au contenu</a>
+  <header class="bandeau">
+    <p class="bandeau__marque">Chantier BTP</p>
+    <h1 class="bandeau__titre" id="titre-vue">Chantiers</h1>
+    <p class="bandeau__statut" id="etat-reseau" role="status" aria-live="polite">Prêt</p>
+  </header>
+  <main id="contenu">
+    <!-- Chantiers -->
+    <section class="vue" id="vue-chantiers" aria-labelledby="titre-chantiers">
+      <div class="vue__entete">
+        <h2 id="titre-chantiers">Chantiers</h2>
+        <button class="bouton bouton--principal" type="button" data-ouvrir="dialogue-chantier">+ Nouveau chantier</button>
+      </div>
+      <p class="vide" id="chantiers-vide" hidden>Aucun chantier enregistré. Touchez « + Nouveau chantier » pour commencer.</p>
+      <ul class="liste" id="liste-chantiers"></ul>
+    </section>
+    <!-- Stock -->
+    <section class="vue" id="vue-stock" aria-labelledby="titre-stock" hidden>
+      <div class="vue__entete">
+        <h2 id="titre-stock">Stock matériaux</h2>
+        <div class="actions">
+          <button class="bouton bouton--principal" type="button" data-ouvrir="dialogue-mouvement" data-type="entree">+ Approvisionner</button>
+          <button class="bouton bouton--sortie" type="button" data-ouvrir="dialogue-mouvement" data-type="sortie">+ Sortie chantier</button>
+        </div>
+      </div>
+      <p class="vide" id="stock-vide" hidden>Aucun matériau au catalogue. Ajoutez un article pour saisir des mouvements.</p>
+      <ul class="liste liste--cartes" id="liste-stock"></ul>
+      <button class="bouton bouton--discret" type="button" data-ouvrir="dialogue-article">+ Nouvel article</button>
+    </section>
+    <!-- Caisse -->
+    <section class="vue" id="vue-caisse" aria-labelledby="titre-caisse" hidden>
+      <div class="solde">
+        <p class="solde__libelle">Solde net disponible</p>
+        <p class="solde__valeur" id="caisse-solde">0</p>
+      </div>
+      <div class="actions actions--caisse">
+        <button class="bouton bouton--entree" type="button" data-ouvrir="dialogue-transaction" data-type="entree">+ Entrée</button>
+        <button class="bouton bouton--sortie" type="button" data-ouvrir="dialogue-transaction" data-type="sortie">− Sortie</button>
+      </div>
+      <h2 id="titre-caisse">Dernières opérations</h2>
+      <p class="vide" id="caisse-vide" hidden>Aucune opération de caisse enregistrée.</p>
+      <ul class="liste" id="liste-caisse"></ul>
+    </section>
+    <!-- Factures -->
+    <section class="vue" id="vue-factures" aria-labelledby="titre-factures" hidden>
+      <div class="vue__entete">
+        <h2 id="titre-factures">Factures</h2>
+        <div class="actions">
+          <button class="bouton bouton--principal" type="button" data-ouvrir="dialogue-facture">+ Nouvelle facture</button>
+          <button class="bouton" type="button" data-ouvrir="dialogue-reglement">Encaisser un règlement</button>
+        </div>
+      </div>
+      <p class="vide" id="factures-vide" hidden>Aucune facture émise.</p>
+      <ul class="liste" id="liste-factures"></ul>
+      <section class="facture" id="facture-detail" aria-labelledby="titre-facture-detail" hidden>
+        <div class="facture__barre">
+          <h2 id="titre-facture-detail">Facture</h2>
+          <div class="actions">
+            <button class="bouton bouton--principal" type="button" id="bouton-imprimer">Imprimer / PDF</button>
+            <button class="bouton" type="button" id="bouton-fermer-facture">Fermer</button>
+          </div>
+        </div>
+        <article id="facture-contenu" class="facture__corps"></article>
+      </section>
+    </section>
+  </main>
+  <nav class="onglets" id="onglets" aria-label="Navigation principale">
+    <button class="onglet" type="button" data-vue="chantiers" aria-selected="true" aria-controls="vue-chantiers"><span class="onglet__icone" aria-hidden="true">▣</span>Chantiers</button>
+    <button class="onglet" type="button" data-vue="stock" aria-selected="false" aria-controls="vue-stock"><span class="onglet__icone" aria-hidden="true">▦</span>Stock</button>
+    <button class="onglet" type="button" data-vue="caisse" aria-selected="false" aria-controls="vue-caisse"><span class="onglet__icone" aria-hidden="true">◍</span>Caisse</button>
+    <button class="onglet" type="button" data-vue="factures" aria-selected="false" aria-controls="vue-factures"><span class="onglet__icone" aria-hidden="true">▤</span>Factures</button>
+  </nav>
+  <!-- Nouveau chantier -->
+  <dialog class="dialogue" id="dialogue-chantier">
+    <form id="form-chantier" class="formulaire">
+      <h2>Nouveau chantier</h2>
+      <label class="champ">Client existant
+        <select name="client_id" id="chantier-client">
+          <option value="">— choisir un client —</option>
+        </select>
+      </label>
+      <label class="champ">Ou nouveau client (nom)
+        <input type="text" name="client_nom" autocomplete="off" placeholder="Ex. Mme Camara">
+      </label>
+      <label class="champ">Nom du chantier *
+        <input type="text" name="nom" required autocomplete="off" placeholder="Ex. Villa Kaba">
+      </label>
+      <label class="champ">Lieu
+        <input type="text" name="lieu" autocomplete="off" placeholder="Ex. Ratoma, Conakry">
+      </label>
+      <label class="champ">Date de début
+        <input type="date" name="date_debut">
+      </label>
+      <label class="champ">Statut
+        <select name="statut"><option value="en_cours">En cours</option><option value="termine">Terminé</option></select>
+      </label>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Nouvel article -->
+  <dialog class="dialogue" id="dialogue-article">
+    <form id="form-article" class="formulaire">
+      <h2>Nouvel article</h2>
+      <label class="champ">Désignation *
+        <input type="text" name="nom" required autocomplete="off" placeholder="Ex. Ciment">
+      </label>
+      <label class="champ">Unité *
+        <select name="unite" required id="article-unite"></select>
+      </label>
+      <label class="champ">Seuil d'alerte
+        <input type="number" name="seuil_alerte" inputmode="numeric" min="0" step="1" value="0">
+      </label>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Mouvement de stock -->
+  <dialog class="dialogue" id="dialogue-mouvement">
+    <form id="form-mouvement" class="formulaire">
+      <h2 id="titre-mouvement">Approvisionner</h2>
+      <input type="hidden" name="type" id="mouvement-type" value="entree">
+      <label class="champ">Article *
+        <select name="article_id" id="mouvement-article" required></select>
+      </label>
+      <label class="champ">Quantité *
+        <input type="number" name="quantite" inputmode="numeric" min="1" step="1" required>
+      </label>
+      <label class="champ" id="champ-mouvement-chantier">Chantier (obligatoire pour une sortie) *
+        <select name="chantier_id" id="mouvement-chantier"></select>
+      </label>
+      <label class="champ">Date *
+        <input type="date" name="date_mouvement" required>
+      </label>
+      <label class="champ">Motif
+        <input type="text" name="motif" autocomplete="off">
+      </label>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Opération de caisse -->
+  <dialog class="dialogue" id="dialogue-transaction">
+    <form id="form-transaction" class="formulaire">
+      <h2 id="titre-transaction">Nouvelle entrée</h2>
+      <input type="hidden" name="type" id="transaction-type" value="entree">
+      <label class="champ">Montant * (entier)
+        <input type="number" name="montant" inputmode="numeric" min="1" step="1" required>
+      </label>
+      <label class="champ">Mode de paiement *
+        <select name="mode_paiement" id="transaction-mode" required></select>
+      </label>
+      <label class="champ">Catégorie *
+        <select name="categorie" id="transaction-categorie" required></select>
+      </label>
+      <label class="champ">Motif *
+        <input type="text" name="motif" required autocomplete="off">
+      </label>
+      <label class="champ">Chantier (facultatif)
+        <select name="chantier_id" id="transaction-chantier"></select>
+      </label>
+      <label class="champ">Date
+        <input type="date" name="date_transaction">
+      </label>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Nouvelle facture -->
+  <dialog class="dialogue" id="dialogue-facture">
+    <form id="form-facture" class="formulaire">
+      <h2>Nouvelle facture</h2>
+      <label class="champ">Chantier *
+        <select name="chantier_id" id="facture-chantier" required></select>
+      </label>
+      <label class="champ">Date d'émission *
+        <input type="date" name="date_emission" required>
+      </label>
+      <label class="champ">Date d'échéance
+        <input type="date" name="date_echeance">
+      </label>
+      <fieldset class="lignes">
+        <legend>Lignes de prestation</legend>
+        <div id="lignes-facture"></div>
+        <button class="bouton bouton--discret" type="button" id="bouton-ajouter-ligne">+ Ajouter une ligne</button>
+      </fieldset>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Émettre la facture</button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Règlement -->
+  <dialog class="dialogue" id="dialogue-reglement">
+    <form id="form-reglement" class="formulaire">
+      <h2>Encaisser un règlement</h2>
+      <label class="champ">Facture *
+        <select name="facture_id" id="reglement-facture" required></select>
+      </label>
+      <p class="note" id="reglement-reste"></p>
+      <label class="champ">Montant reçu * (entier)
+        <input type="number" name="montant" inputmode="numeric" min="1" step="1" required>
+      </label>
+      <label class="champ">Mode de paiement *
+        <select name="mode_paiement" id="reglement-mode" required></select>
+      </label>
+      <label class="champ">Date du règlement
+        <input type="date" name="date_reglement">
+      </label>
+      <label class="champ">Référence
+        <input type="text" name="reference" autocomplete="off" placeholder="Ex. reçu n° 12">
+      </label>
+      <div class="dialogue__actions">
+        <button class="bouton" type="button" data-fermer>Annuler</button>
+        <button class="bouton bouton--principal" type="submit">Encaisser</button>
+      </div>
+    </form>
+  </dialog>
+  <template id="gabarit-ligne-facture">
+    <div class="ligne-facture">
+      <label class="champ">Désignation *
+        <input type="text" name="designation" required autocomplete="off">
+      </label>
+      <div class="ligne-facture__duo">
+        <label class="champ">Quantité *
+          <input type="number" name="quantite" inputmode="numeric" min="1" step="1" required>
+        </label>
+        <label class="champ">Prix unitaire *
+          <input type="number" name="prix_unitaire" inputmode="numeric" min="0" step="1" required>
+        </label>
+      </div>
+    </div>
+  </template>
+  <script type="module" src="public/app.js"></script>
+</body>
+</html>

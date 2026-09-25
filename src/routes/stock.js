@@ -93,6 +93,35 @@ export function createStockRouter() {
     res.status(201).json(db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(result.lastInsertRowid));
   });
 
+  router.get('/stock/mouvements', (req, res) => {
+    res.json(req.app.locals.db.prepare('SELECT * FROM mouvements_stock ORDER BY id DESC').all());
+  });
+
+  router.post('/stock/mouvements/:id/annuler', (req, res) => {
+    const db = req.app.locals.db;
+    const id = idEntier(req.params.id);
+    const motif = texteOuNull(corpsObjet(req.body).motif);
+    if (!motif) return res.status(400).json({ error: 'Le motif est obligatoire pour annuler un mouvement' });
+    const original = id === null ? null : db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(id);
+    if (!original) return res.status(404).json({ error: `Mouvement ${req.params.id} introuvable` });
+    if (original.annule_par_id || db.prepare('SELECT id FROM mouvements_stock WHERE annule_par_id = ?').get(id)) {
+      return res.status(400).json({ error: 'Ce mouvement est déjà annulé ou compensatoire' });
+    }
+    const compensation = db.transaction(() => {
+      const type = original.type === 'entree' ? 'sortie' : 'entree';
+      const result = db.prepare(`INSERT INTO mouvements_stock
+        (article_id, chantier_id, type, quantite, date_mouvement, motif, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(original.article_id, original.chantier_id, type, original.quantite,
+        original.date_mouvement, `Annulation: ${motif}`, Date.now());
+      db.prepare('UPDATE mouvements_stock SET annule_par_id = ? WHERE id = ?').run(result.lastInsertRowid, id);
+      const apres = db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(result.lastInsertRowid);
+      db.prepare(`INSERT INTO historique_saisies (domaine, reference_id, action, motif, valeur_avant, valeur_apres, created_at)
+        VALUES ('stock', ?, 'annulation', ?, ?, ?, ?)`).run(id, motif, JSON.stringify(original), JSON.stringify(apres), Date.now());
+      return result.lastInsertRowid;
+    })();
+    res.status(201).json(db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(compensation));
+  });
+
   router.get('/chantiers/:id/consommations', (req, res) => {
     const db = req.app.locals.db;
     const chantierId = idEntier(req.params.id);

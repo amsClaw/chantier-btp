@@ -123,7 +123,8 @@ async function chargerChantiers() {
       <div class="panneau" data-panneau="${chantier.id}" hidden></div></li>`).join('');
 }
 async function chargerStock() {
-  etat.articles = await api('/api/articles');
+  const [articles, mouvements] = await Promise.all([api('/api/articles'), api('/api/stock/mouvements')]);
+  etat.articles = articles;
   const liste = $('#liste-stock');
   $('#stock-vide').hidden = etat.articles.length > 0;
   liste.innerHTML = etat.articles.map((article) => {
@@ -143,6 +144,7 @@ async function chargerStock() {
           <button class="bouton bouton--mini bouton--principal" type="button" data-mouvement="entree" data-article="${article.id}">+ Approvisionner</button>
           <button class="bouton bouton--mini bouton--sortie" type="button" data-mouvement="sortie" data-article="${article.id}">+ Sortie chantier</button>
         </div>
+        ${mouvements.filter((mouvement) => mouvement.article_id === article.id && !mouvement.annule_par_id && !mouvements.some((compensation) => compensation.annule_par_id === mouvement.id)).map((mouvement) => `<button class="bouton bouton--mini" type="button" data-annuler-stock="${mouvement.id}">Annuler le mouvement du ${echapper(mouvement.date_mouvement)}</button>`).join('')}
       </li>`;
   }).join('');
 }
@@ -158,6 +160,7 @@ async function chargerCaisse() {
         <h3 class="carte__titre">${echapper(operation.motif)}</h3> <span class="montant montant--${echapper(operation.type)}">${operation.type === 'entree' ? '+' : '−'} ${montant(operation.montant)}</span>
       </div>
       <p class="carte__meta">${echapper(operation.date_transaction)} · ${echapper(operation.categorie)} · ${echapper(operation.mode_paiement)}</p>
+      ${!operation.annule_par_id && !String(operation.motif).startsWith('Annulation:') ? `<button class="bouton bouton--mini" type="button" data-annuler-caisse="${operation.id}">Annuler</button>` : ''}
     </li>`).join('');
 }
 async function chargerFactures() {
@@ -172,6 +175,7 @@ async function chargerFactures() {
       <div class="actions">
         <button class="bouton bouton--mini" type="button" data-ouvrir-facture="${facture.id}">Voir / imprimer</button>
         ${facture.reste_a_payer > 0 ? `<button class="bouton bouton--mini bouton--principal" type="button" data-regler="${facture.id}">Encaisser un règlement</button>` : ''}
+        ${facture.montant_regle === 0 ? '<button class="bouton bouton--mini" type="button" data-corriger-facture="' + facture.id + '">Corriger</button>' : ''}
       </div>
     </li>`).join('');
 }
@@ -302,7 +306,7 @@ function brancherEvenements() {
     if (bouton) afficherVue(bouton.dataset.vue);
   });
   document.addEventListener('click', (evenement) => {
-    const cible = evenement.target.closest('[data-ouvrir], [data-fermer], [data-detail-chantier], [data-ouvrir-facture], [data-regler], [data-mouvement]');
+    const cible = evenement.target.closest('[data-ouvrir], [data-fermer], [data-detail-chantier], [data-ouvrir-facture], [data-regler], [data-mouvement], [data-annuler-stock], [data-annuler-caisse], [data-corriger-facture]');
     if (!cible) return;
     if (cible.dataset.fermer !== undefined) {
       cible.closest('dialog').close();
@@ -325,6 +329,9 @@ function brancherEvenements() {
       preparerMouvement(cible.dataset.mouvement, Number(cible.dataset.article));
       return;
     }
+    if (cible.dataset.annulerStock) { preparerAudit('stock', cible.dataset.annulerStock, 'Annuler le mouvement'); ouvrirDialogue('dialogue-audit'); return; }
+    if (cible.dataset.annulerCaisse) { preparerAudit('caisse', cible.dataset.annulerCaisse, 'Annuler la transaction'); ouvrirDialogue('dialogue-audit'); return; }
+    if (cible.dataset.corrigerFacture) { preparerAudit('facture', cible.dataset.corrigerFacture, 'Corriger la facture'); ouvrirDialogue('dialogue-audit'); return; }
     if (cible.dataset.ouvrir) {
       const dialogue = cible.dataset.ouvrir;
       if (dialogue === 'dialogue-chantier') preparerChantier();
@@ -352,6 +359,12 @@ async function preparerMouvement(type, articleId) {
   formulaire.elements.chantier_id.required = type === 'sortie';
   remplirSelect('#mouvement-article', optionsArticles(), { vide: '— choisir un article —', valeurForcee: articleId });
   remplirSelect('#mouvement-chantier', optionsChantiers(), { vide: '— choisir un chantier —' });
+}
+function preparerAudit(domaine, referenceId, titre) {
+  $('#audit-domaine').value = domaine;
+  $('#audit-reference').value = referenceId;
+  $('#audit-motif').value = '';
+  $('#titre-audit').textContent = titre;
 }
 function preparerTransaction(type) {
   const formulaire = $('#form-transaction');
@@ -485,6 +498,27 @@ export function initialiserInterface() {
       message(`Règlement encaissé sur ${facture.numero}`, 'ok');
       await recharger(['factures', 'caisse']);
       await ouvrirFacture(factureId);
+    });
+  });
+  $('#form-audit').addEventListener('submit', (evenement) => {
+    evenement.preventDefault();
+    const formulaire = evenement.currentTarget;
+    soumettre(formulaire, async () => {
+      const domaine = formulaire.elements.domaine.value;
+      const id = formulaire.elements.reference_id.value;
+      const motif = formulaire.elements.motif.value.trim();
+      if (domaine === 'facture') {
+        const facture = await api(`/api/factures/${id}`);
+        const ligne = facture.lignes && facture.lignes[0];
+        if (!ligne) throw new Error('Ouvrez la facture pour corriger une ligne');
+        await api(`/api/factures/${id}/lignes/${ligne.id}`, { motif }, 'PATCH');
+        await recharger(['factures']);
+      } else {
+        await api(`/api/${domaine === 'stock' ? 'stock/mouvements' : 'caisse/transactions'}/${id}/annuler`, { motif });
+        await recharger([domaine]);
+      }
+      formulaire.closest('dialog').close();
+      message('Opération enregistrée avec piste d’audit', 'ok');
     });
   });
   // Clôture d'un chantier (bouton rendu par chargerChantiers) : PATCH /api/chantiers/:id

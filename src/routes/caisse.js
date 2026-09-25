@@ -21,7 +21,7 @@ export const CATEGORIES_CAISSE = [
 
 /** Colonnes exposées par l'API (contrat explicite, pas de `SELECT *`). */
 export const CHAMPS_TRANSACTION =
-  'id, type, montant, mode_paiement, categorie, motif, chantier_id, date_transaction, created_at';
+  'id, type, montant, mode_paiement, categorie, motif, chantier_id, date_transaction, created_at, annule_par_id';
 
 const DATE_TRANSACTION = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -156,6 +156,33 @@ export function createCaisseRouter() {
     res.status(201).json(
       db.prepare(`SELECT ${CHAMPS_TRANSACTION} FROM transactions_caisse WHERE id = ?`).get(lastInsertRowid),
     );
+  });
+
+  router.post('/caisse/transactions/:id/annuler', (req, res) => {
+    const db = req.app.locals.db;
+    const id = idEntier(req.params.id);
+    const motif = texteOuNull(corpsObjet(req.body).motif);
+    if (!motif) return res.status(400).json({ error: 'Le motif est obligatoire pour annuler une transaction' });
+    const original = id === null ? null : db.prepare('SELECT * FROM transactions_caisse WHERE id = ?').get(id);
+    if (!original) return res.status(404).json({ error: `Transaction ${req.params.id} introuvable` });
+    if (original.annule_par_id || db.prepare('SELECT id FROM transactions_caisse WHERE annule_par_id = ?').get(id)) {
+      return res.status(400).json({ error: 'Cette transaction est déjà annulée ou compensatoire' });
+    }
+    if (db.prepare('SELECT id FROM reglements_facture WHERE transaction_caisse_id = ?').get(id)) {
+      return res.status(400).json({ error: 'Une transaction issue d’un règlement de facture ne peut pas être annulée' });
+    }
+    const compensation = db.transaction(() => {
+      const result = db.prepare(`INSERT INTO transactions_caisse
+        (type, montant, mode_paiement, categorie, motif, chantier_id, date_transaction, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(original.type === 'entree' ? 'sortie' : 'entree', original.montant,
+        original.mode_paiement, original.categorie, `Annulation: ${motif}`, original.chantier_id, original.date_transaction, Date.now());
+      db.prepare('UPDATE transactions_caisse SET annule_par_id = ? WHERE id = ?').run(result.lastInsertRowid, id);
+      const apres = db.prepare('SELECT * FROM transactions_caisse WHERE id = ?').get(result.lastInsertRowid);
+      db.prepare(`INSERT INTO historique_saisies (domaine, reference_id, action, motif, valeur_avant, valeur_apres, created_at)
+        VALUES ('caisse', ?, 'annulation', ?, ?, ?, ?)`).run(id, motif, JSON.stringify(original), JSON.stringify(apres), Date.now());
+      return result.lastInsertRowid;
+    })();
+    res.status(201).json(db.prepare(`SELECT ${CHAMPS_TRANSACTION}, annule_par_id FROM transactions_caisse WHERE id = ?`).get(compensation));
   });
 
   return router;

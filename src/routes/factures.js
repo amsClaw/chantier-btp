@@ -133,6 +133,31 @@ export function createFacturesRouter() {
     res.json(facture);
   });
 
+  router.patch('/factures/:id/lignes/:ligneId', (req, res) => {
+    const db = req.app.locals.db;
+    const factureId = idEntier(req.params.id);
+    const ligneId = idEntier(req.params.ligneId);
+    const facture = factureId === null ? null : selectionFacture(db, factureId);
+    const body = corpsObjet(req.body);
+    const motif = texteOuNull(body.motif);
+    const ligne = ligneId === null ? null : db.prepare('SELECT * FROM lignes_facture WHERE id = ? AND facture_id = ?').get(ligneId, factureId);
+    if (!facture || !ligne) return res.status(404).json({ error: 'Facture ou ligne introuvable' });
+    if (!motif) return erreur(res, 'Le motif est obligatoire pour corriger une ligne');
+    if (facture.montant_regle > 0) return res.status(409).json({ error: 'Une facture déjà réglée ne peut plus être corrigée' });
+    const designation = body.designation === undefined ? ligne.designation : texteOuNull(body.designation);
+    const quantite = body.quantite === undefined ? ligne.quantite : entierPositif(body.quantite);
+    const prixUnitaire = body.prix_unitaire === undefined ? ligne.prix_unitaire : (Number.isInteger(body.prix_unitaire) && body.prix_unitaire >= 0 ? body.prix_unitaire : null);
+    if (!designation || !quantite || prixUnitaire === null) return erreur(res, 'Les valeurs de la ligne sont invalides');
+    const apres = { ...ligne, designation, quantite, prix_unitaire: prixUnitaire, total_ligne: quantite * prixUnitaire };
+    db.transaction(() => {
+      db.prepare('UPDATE lignes_facture SET designation = ?, quantite = ?, prix_unitaire = ?, total_ligne = ? WHERE id = ?')
+        .run(designation, quantite, prixUnitaire, apres.total_ligne, ligneId);
+      db.prepare(`INSERT INTO historique_saisies (domaine, reference_id, action, motif, valeur_avant, valeur_apres, created_at)
+        VALUES ('facture', ?, 'correction', ?, ?, ?, ?)`).run(ligneId, motif, JSON.stringify(ligne), JSON.stringify(apres), Date.now());
+    })();
+    res.json(selectionFacture(db, factureId));
+  });
+
   router.post('/factures/:id/reglements', (req, res) => {
     const db = req.app.locals.db;
     const id = idEntier(req.params.id);
@@ -166,6 +191,16 @@ export function createFacturesRouter() {
       return reglement.lastInsertRowid;
     })();
     res.status(201).json(selectionFacture(db, id));
+  });
+
+  router.get('/historique/:domaine/:reference_id', (req, res) => {
+    const domaines = ['stock', 'caisse', 'facture'];
+    const referenceId = idEntier(req.params.reference_id);
+    if (!domaines.includes(req.params.domaine) || referenceId === null) {
+      return res.status(400).json({ error: 'Domaine ou référence invalide' });
+    }
+    res.json(req.app.locals.db.prepare(`SELECT id, domaine, reference_id, action, motif, valeur_avant, valeur_apres, created_at
+      FROM historique_saisies WHERE domaine = ? AND reference_id = ? ORDER BY id`).all(req.params.domaine, referenceId));
   });
 
   return router;

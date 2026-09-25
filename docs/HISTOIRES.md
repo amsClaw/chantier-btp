@@ -197,3 +197,48 @@ Découpage en 7 histoires de 1 à 4 heures chacune, à réaliser dans l'ordre st
 **Ne touche pas :** altération des tables SQLite déjà validées.
 
 **Résultat visible :** `README.md` complet, suite `npm test` verte, et serveur capable d'être démarré avec une configuration personnalisée (`PORT=9000 CURRENCY_SYMBOL=GNF npm start`) en chargeant des données de test via `npm run seed`.
+
+---
+
+## Histoire 8 — Correction et annulation de saisie avec piste d'audit
+
+**Titre :** Permettre d'annuler un mouvement de stock ou une opération de caisse, et de corriger une ligne de facture non réglée, sans jamais perdre la saisie d'origine ni casser les soldes déjà validés.
+
+**Contexte (décision d'Ams, 2026-09-25) :** aucune saisie n'est aujourd'hui corrigible ni supprimable ; une erreur de frappe (ex. prix unitaire erroné) est bloquante. Voir `docs/DECISIONS.md`. **Cette histoire touche la correction de données financières déjà émises (liste 2 de `docs/contrats/POLICY.md`) : la fusion en production attend la validation explicite d'Ams après revue du juge — pas d'auto-merge.**
+
+**Complexité :** standard
+
+**Critères d'acceptation :**
+1. Nouvelle table SQLite au démarrage, commune aux trois domaines :
+   - `historique_saisies (id INTEGER PRIMARY KEY AUTOINCREMENT, domaine TEXT NOT NULL CHECK(domaine IN ('stock', 'caisse', 'facture')), reference_id INTEGER NOT NULL, action TEXT NOT NULL CHECK(action IN ('annulation', 'correction')), motif TEXT NOT NULL, valeur_avant TEXT NOT NULL, valeur_apres TEXT, created_at INTEGER NOT NULL)`
+   - `valeur_avant` / `valeur_apres` : snapshot JSON de la ligne concernée avant/après l'opération.
+2. **Stock — annulation, jamais de suppression :**
+   - `POST /api/stock/mouvements/:id/annuler` avec `{ motif }` (obligatoire, HTTP 400 sinon).
+   - Crée un **nouveau mouvement compensatoire** (même article, même chantier, même quantité, type inversé), ajoute une colonne `mouvements_stock.annule_par_id INTEGER REFERENCES mouvements_stock(id)` pour lier l'original à sa compensation.
+   - Refuse (HTTP 400) d'annuler un mouvement déjà annulé, ou un mouvement compensatoire lui-même.
+   - Écrit une ligne dans `historique_saisies` (`domaine: 'stock'`, `action: 'annulation'`).
+   - Le mouvement d'origine reste visible tel quel dans `GET /api/articles/:id/mouvements` (ou équivalent existant), avec son statut d'annulation.
+3. **Caisse — annulation, jamais de suppression :**
+   - `POST /api/caisse/transactions/:id/annuler` avec `{ motif }` (obligatoire).
+   - Crée une **transaction compensatoire** (même montant, même chantier, type inversé), colonne `transactions_caisse.annule_par_id` pour le lien.
+   - Refuse (HTTP 400, message explicite) d'annuler une transaction créée automatiquement par un règlement de facture (`transactions_caisse.id` référencé par `reglements_facture.transaction_caisse_id`) : ce cas n'est pas dans le périmètre de cette histoire.
+   - Écrit une ligne dans `historique_saisies` (`domaine: 'caisse'`).
+4. **Facture — correction de ligne, seulement avant tout règlement :**
+   - `PATCH /api/factures/:id/lignes/:ligneId` avec `{ designation?, quantite?, prix_unitaire?, motif }` (`motif` obligatoire).
+   - Autorisé **uniquement** si `montant_regle` de la facture est à 0 (aucun règlement perçu) ; sinon HTTP 409 avec message explicite invitant à une facture d'avoir/correctif plutôt qu'une modification (hors périmètre ici).
+   - Recalcule `total_ligne` et le total de la facture.
+   - Écrit une ligne dans `historique_saisies` (`domaine: 'facture'`, `action: 'correction'`, `valeur_avant`/`valeur_apres` = snapshot de la ligne).
+5. `GET /api/historique/:domaine/:reference_id` : retourne l'historique des annulations/corrections pour une saisie donnée (utilisé par l'interface pour afficher qui a changé quoi et pourquoi).
+6. Interface (Stock, Caisse, Factures) : chaque saisie annulable/corrigible affiche une action « Annuler » (stock, caisse) ou « Corriger » (ligne de facture non réglée) qui ouvre une boîte de dialogue **exigeant un motif** avant validation. Une saisie déjà annulée ou une facture réglée n'affiche plus cette action.
+7. Tests d'intégration dans `test/audit.test.js` :
+   - Annulation d'un mouvement de stock → stock revient à sa valeur d'avant, mouvement d'origine toujours listé, historique horodaté avec motif.
+   - Tentative de double annulation du même mouvement → rejetée (HTTP 400).
+   - Annulation d'une transaction de caisse → solde net revient à sa valeur d'avant.
+   - Tentative d'annulation d'une transaction issue d'un règlement de facture → rejetée (HTTP 400).
+   - Correction d'une ligne de facture non réglée → total recalculé, historique avant/après enregistré.
+   - Tentative de correction d'une ligne sur une facture partiellement réglée → rejetée (HTTP 409).
+8. `npm test` vert, aucune régression sur les histoires 1 à 7.
+
+**Ne touche pas :** authentification, rôles/permissions (qui a le droit d'annuler n'est pas tranché par cette histoire — pour l'instant, comme le reste de l'app, tout accès au réseau local peut annuler/corriger), facture d'avoir formelle.
+
+**Résultat visible :** dans l'interface, un mouvement de stock ou une opération de caisse erronés peuvent être annulés avec un motif, sans jamais disparaître de l'historique ; une ligne de facture peut être corrigée tant qu'aucun règlement n'a été perçu. `npm test` toujours vert.

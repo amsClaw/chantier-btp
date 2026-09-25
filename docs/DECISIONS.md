@@ -19,3 +19,20 @@ priment en cas d'écart.
 - Si l'application est un jour exposée sur internet, la protection se fera **en amont** (reverse proxy
   avec authentification, ou VPN) et non dans le code du produit.
 - Ams n'a pas encore tranché ce point : à confirmer avant la mise en ligne publique.
+
+## 2026-09-25 — Correction et annulation de saisie avec piste d'audit (Histoire 8)
+
+- Constat pendant la recette manuelle d'Ams : aucune saisie (mouvement de stock, opération
+  de caisse, ligne de facture) ne peut être corrigée ni supprimée depuis l'interface. Une
+  erreur de frappe (ex. un zéro de trop sur un prix unitaire) reste bloquante — la seule
+  option observée a été une correction manuelle en base, hors produit.
+- Décision : **jamais de suppression physique**. Toute correction ou annulation se fait par
+  une **écriture compensatoire** (mouvement inverse, ligne de correction) qui laisse la
+  saisie d'origine visible, horodatée, avec un **motif obligatoire**. Cohérent avec le choix
+  déjà fait par le cadreur de n'exposer aucune route `DELETE`.
+- Portée : `mouvements_stock`, `transactions_caisse`, `lignes_facture` (uniquement tant
+  qu'aucun règlement n'a été perçu sur la facture — au-delà, seule une correction
+  compensatoire est possible, jamais une modification de la ligne d'origine).
+- Cadré en Histoire 8 (`docs/HISTOIRES.md`). **Liste 2 de `POLICY.md`** : cette histoire
+  touche la correction de données financières déjà émises (caisse, factures) — la fusion
+  en production attend la validation explicite d'Ams après revue, pas d'auto-merge.

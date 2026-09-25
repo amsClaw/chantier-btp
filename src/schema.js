@@ -47,6 +47,18 @@ export const SCHEMA_STATEMENTS = [
      motif TEXT,
      created_at INTEGER NOT NULL
    )`,
+  // Histoire 4 — Journal de caisse (entrées / sorties d'argent du terrain).
+  `CREATE TABLE IF NOT EXISTS transactions_caisse (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     type TEXT NOT NULL CHECK(type IN ('entree', 'sortie')),
+     montant INTEGER NOT NULL CHECK(montant > 0),
+     mode_paiement TEXT NOT NULL CHECK(mode_paiement IN ('especes', 'mobile_money', 'virement', 'cheque')),
+     categorie TEXT NOT NULL,
+     motif TEXT NOT NULL,
+     chantier_id INTEGER REFERENCES chantiers(id),
+     date_transaction TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   )`,
 ];
 
 /**

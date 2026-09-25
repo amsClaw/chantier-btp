@@ -1,5 +1,6 @@
 import express from 'express';
 
+import { createCaisseRouter } from './routes/caisse.js';
 import { createChantiersRouter } from './routes/chantiers.js';
 import { createClientsRouter } from './routes/clients.js';
 import { createStockRouter } from './routes/stock.js';
@@ -30,6 +31,7 @@ export function createApp({ db } = {}) {
   // aux lignes ci-dessus (src/routes/<domaine>.js).
   app.use('/api/clients', createClientsRouter());
   app.use('/api', createStockRouter());
+  app.use('/api', createCaisseRouter());
   app.use('/api/chantiers', createChantiersRouter());
 
   return app;

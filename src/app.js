@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { createCaisseRouter } from './routes/caisse.js';
+import { createFacturesRouter } from './routes/factures.js';
 import { createChantiersRouter } from './routes/chantiers.js';
 import { createClientsRouter } from './routes/clients.js';
 import { createStockRouter } from './routes/stock.js';
@@ -32,6 +33,7 @@ export function createApp({ db } = {}) {
   app.use('/api/clients', createClientsRouter());
   app.use('/api', createStockRouter());
   app.use('/api', createCaisseRouter());
+  app.use('/api', createFacturesRouter());
   app.use('/api/chantiers', createChantiersRouter());
 
   return app;

@@ -29,6 +29,24 @@ export const SCHEMA_STATEMENTS = [
      date_debut TEXT,
      created_at INTEGER NOT NULL
    )`,
+  // Histoire 3 — Articles et mouvements de stock.
+  `CREATE TABLE IF NOT EXISTS articles (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     nom TEXT NOT NULL,
+     unite TEXT NOT NULL,
+     seuil_alerte INTEGER DEFAULT 0,
+     created_at INTEGER NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS mouvements_stock (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     article_id INTEGER NOT NULL REFERENCES articles(id),
+     chantier_id INTEGER REFERENCES chantiers(id),
+     type TEXT NOT NULL CHECK(type IN ('entree', 'sortie')),
+     quantite INTEGER NOT NULL CHECK(quantite > 0),
+     date_mouvement TEXT NOT NULL,
+     motif TEXT,
+     created_at INTEGER NOT NULL
+   )`,
 ];
 
 /**

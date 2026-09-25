@@ -49,7 +49,7 @@ Une application web mobile-first locale et autonome (Node.js/Express + SQLite), 
 
 11. **Configuration par variables d'environnement et zéro chemin absolu.**
     Le port (`PORT`), le chemin du fichier de base de données (`DB_PATH`, valeur par défaut `./data/chantier.sqlite`) et le symbole monétaire (`CURRENCY_SYMBOL`, valeur par défaut `GNF` — franc guinéen) sont paramétrables par variables d'environnement.
-    *Critère observable :* Lancer le serveur avec `DB_PATH=/tmp/test-chantier.sqlite PORT=8080 CURRENCY_SYMBOL=GNF npm start` crée la base au chemin indiqué et affiche les montants en `GNF` ; aucune chaîne contenant un chemin utilisateur local (ex. `/Users/...` ou `/home/...`) n'est codée en dur dans le code source.
+    *Critère observable :* Lancer le serveur avec `DB_PATH=/tmp/test-chantier.sqlite PORT=8080 CURRENCY_SYMBOL=GNF npm start` crée la base au chemin indiqué et affiche les montants en `GNF` ; aucune chaîne contenant un chemin utilisateur local (répertoire personnel du poste) n'est codée en dur dans le code source.
 
 12. **Robustesse face aux saisies invalides et aux erreurs.**
     L'application valide les données saisies côté serveur (rejet des montants négatifs, des quantités nulles, des formats incohérents). Les routes inexistantes renvoient une 404 propre et aucune erreur client ou requête malformée ne provoque l'arrêt du processus Node.js.

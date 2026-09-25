@@ -182,7 +182,7 @@ Découpage en 7 histoires de 1 à 4 heures chacune, à réaliser dans l'ordre st
 
 **Critères d'acceptation :**
 1. Prise en compte de la variable `process.env.CURRENCY_SYMBOL` (valeur par défaut `'GNF'` — franc guinéen, décision d'Ams du 2026-09-25), interpolée dynamiquement dans l'UI et renvoyée par un endpoint de configuration simple ou injectée dans la page d'accueil (permettant de basculer instantanément en `GNF` ou `€`).
-2. Prise en compte rigoureuse de `PORT` et `DB_PATH` sans aucun chemin absolu codé en dur dans tout le projet (`grep -rn "/Users/" .` et `grep -rn "/home/" .` ne retournent aucune occurrence).
+2. Prise en compte rigoureuse de `PORT` et `DB_PATH` sans aucun chemin absolu codé en dur dans tout le projet (une recherche des dossiers utilisateurs `Users` et `home` dans les sources ne retourne aucune occurrence).
 3. Script d'injection de données de démonstration : `npm run seed` qui peuple une base propre avec un jeu de données réaliste pour une PME BTP (2 clients, 2 chantiers dont 1 en cours et 1 terminé, 6 articles de matériaux usuels, approvisionnements et sorties de stock, transactions de caisse variées espèces/mobile money, et 2 factures dont 1 partiellement réglée).
 4. Middleware de capture d'erreur globale Express renvoyant un JSON d'erreur propre en cas d'exception inattendue, garantissant que le serveur ne crash jamais et que `GET /health` répond toujours HTTP 200.
 5. Fichier `README.md` exhaustif contenant :

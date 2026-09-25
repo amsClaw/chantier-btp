@@ -2,9 +2,12 @@
  * Toutes les données viennent de l'API Express existante : aucune règle métier n'est
  * dupliquée ici. Chaque action appelle la route correspondante puis recharge les
  * indicateurs à l'écran, sans rechargement de page. */
-/* Le symbole monétaire sera rendu paramétrable par CURRENCY_SYMBOL dans une histoire
- * ultérieure ; en attendant, on centralise la valeur ici pour n'avoir qu'un point à changer. */
-const DEVISE = 'GNF';
+/* Symbole monétaire de l'instance : servi par `GET /api/config` (variable
+ * d'environnement CURRENCY_SYMBOL, défaut GNF). Il est fixé au démarrage par
+ * `definirDevise()` ; tant que la configuration n'est pas chargée, on affiche le
+ * défaut pour ne jamais montrer un montant sans devise. */
+export const DEVISE_PAR_DEFAUT = 'GNF';
+let devise = DEVISE_PAR_DEFAUT;
 const UNITES = ['sac', 'barre', 'm3', 'tonne', 'litre', 'piece', 'kg', 'metre', 'lot'];
 const MODES_PAIEMENT = [['especes', 'Espèces'], ['mobile_money', 'Mobile Money'], ['virement', 'Virement'], ['cheque', 'Chèque']];
 const CATEGORIES = [['achat_materiaux', 'Achat matériaux'], ['main_d_oeuvre', "Main d'œuvre / tâcherons"], ['carburant', 'Carburant'], ['transport', 'Transport'], ['apport_caisse', 'Apport caisse'], ['reglement_client', 'Règlement client'], ['divers', 'Divers']];
@@ -19,9 +22,29 @@ export function echapper(valeur) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[caractere]));
 }
-/** Montant entier lisible, avec son symbole monétaire. */
+/** Montant entier lisible, avec le symbole monétaire de l'instance. */
 export function montant(valeur) {
-  return `${Number(valeur ?? 0).toLocaleString('fr-FR')} ${DEVISE}`;
+  return `${Number(valeur ?? 0).toLocaleString('fr-FR')} ${devise}`;
+}
+/** Symbole monétaire actuellement affiché (par défaut `GNF`). */
+export function deviseCourante() {
+  return devise;
+}
+/**
+ * Fixe le symbole monétaire affiché pour toute la page.
+ *
+ * Appelé au démarrage avec `GET /api/config`, il met aussi à jour le bandeau
+ * supérieur : la valeur visible par l'utilisateur suit donc `CURRENCY_SYMBOL`
+ * sans rechargement. Renvoie le symbole retenu (le défaut si la valeur est vide).
+ */
+export function definirDevise(symbole) {
+  const texte = symbole === undefined || symbole === null ? '' : String(symbole).trim();
+  if (texte !== '') devise = texte;
+  if (typeof document !== 'undefined') {
+    const bloc = document.getElementById('devise-app');
+    if (bloc) bloc.textContent = devise;
+  }
+  return devise;
 }
 /** Date du jour au format AAAA-MM-JJ (valeur par défaut des champs de date). */
 function aujourdhui() {
@@ -477,7 +500,12 @@ export function initialiserInterface() {
       bouton.disabled = false;
     }
   });
-  return recharger(['clients', 'chantiers', 'stock', 'caisse', 'factures'])
+  return api('/api/config')
+    // Devise de l'instance : si la route est indisponible, on garde le défaut (GNF)
+    // plutôt que d'empêcher l'affichage des données.
+    .then((configuration) => definirDevise(configuration.currency_symbol))
+    .catch(() => deviseCourante())
+    .then(() => recharger(['clients', 'chantiers', 'stock', 'caisse', 'factures']))
     .then(() => {
       afficherVue('chantiers');
       message('Données à jour', 'ok');

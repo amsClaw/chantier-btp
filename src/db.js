@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 
+import { initSchema } from './schema.js';
+
 /**
  * Chemin de la base par défaut, surchargeable par la variable d'environnement
  * `DB_PATH` (exigence : `process.env.DB_PATH || './data/chantier.sqlite'`).
@@ -14,13 +16,14 @@ export function resolveDbPath(dbPath) {
 }
 
 /**
- * Ouvre (et crée au besoin) la base SQLite.
+ * Ouvre (et crée au besoin) la base SQLite, puis crée les tables manquantes
+ * (`initSchema`, CREATE TABLE IF NOT EXISTS : l'appel est idempotent).
  *
  * Le répertoire parent est créé récursivement s'il n'existe pas : sur un poste
  * de chantier, `./data/` n'existe jamais au premier démarrage.
  *
- * Aucune table métier n'est créée ici : les tables (clients, chantiers, stocks,
- * caisse, factures) arrivent avec leurs histoires respectives.
+ * Les tables des histoires suivantes (stocks, caisse, factures) sont ajoutées
+ * dans src/schema.js.
  */
 export function openDatabase(dbPath) {
   const resolved = resolveDbPath(dbPath);
@@ -29,5 +32,6 @@ export function openDatabase(dbPath) {
   const db = new Database(resolved);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  initSchema(db);
   return db;
 }

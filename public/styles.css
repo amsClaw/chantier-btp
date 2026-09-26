@@ -407,4 +407,7 @@ input[type="number"] {
   .facture__table .col-pu {
     display: table-cell;
   }
+  .no-impression {
+    display: none !important;
+  }
 }

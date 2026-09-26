@@ -239,6 +239,23 @@
       </div>
     </form>
   </dialog>
+  <dialog class="dialogue" id="dialogue-audit">
+    <form id="form-audit" class="formulaire">
+      <h2 id="titre-audit">Confirmer l'opération</h2>
+      <input type="hidden" name="domaine" id="audit-domaine">
+      <input type="hidden" name="reference_id" id="audit-reference">
+      <input type="hidden" name="ligne_id" id="audit-ligne-id">
+      <div id="champ-audit-ligne" hidden>
+        <label class="champ">Désignation *<input type="text" name="designation" id="audit-designation" autocomplete="off"></label>
+        <div class="ligne-facture__duo">
+          <label class="champ">Quantité *<input type="number" name="quantite" id="audit-quantite" inputmode="numeric" min="1" step="1"></label>
+          <label class="champ">Prix unitaire *<input type="number" name="prix_unitaire" id="audit-prix-unitaire" inputmode="numeric" min="0" step="1"></label>
+        </div>
+      </div>
+      <label class="champ">Motif obligatoire *<input type="text" name="motif" id="audit-motif" required autocomplete="off"></label>
+      <div class="dialogue__actions"><button class="bouton" type="button" data-fermer>Annuler</button><button class="bouton bouton--principal" type="submit">Valider</button></div>
+    </form>
+  </dialog>
   <template id="gabarit-ligne-facture">
     <div class="ligne-facture">
       <label class="champ">Désignation *

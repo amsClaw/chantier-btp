@@ -86,7 +86,7 @@ test('un acompte puis le solde alimentent la caisse et recalculent le statut', a
   assert.deepEqual(caisse.json[0], {
     id: caisse.json[0].id, type: 'entree', montant: 400000, mode_paiement: 'mobile_money',
     categorie: 'reglement_client', motif: 'Règlement Facture FAC-2026-0001 - Client Facturation',
-    chantier_id: chantier.id, date_transaction: '2026-09-26', created_at: caisse.json[0].created_at,
+    chantier_id: chantier.id, date_transaction: '2026-09-26', created_at: caisse.json[0].created_at, annule_par_id: null,
   });
 
   const solde = await requete(instance, `/api/factures/${facture.json.id}/reglements`, 'POST', {

@@ -37,8 +37,8 @@ test('les tables articles et mouvements_stock sont créées avec leurs contraint
   assert.deepEqual(instance.db.pragma('table_info(articles)').map((c) => c.name),
     ['id', 'nom', 'unite', 'seuil_alerte', 'created_at']);
   assert.deepEqual(instance.db.pragma('table_info(mouvements_stock)').map((c) => c.name),
-    ['id', 'article_id', 'chantier_id', 'type', 'quantite', 'date_mouvement', 'motif', 'created_at']);
-  assert.equal(instance.db.pragma('foreign_key_list(mouvements_stock)').length, 2);
+    ['id', 'article_id', 'chantier_id', 'type', 'quantite', 'date_mouvement', 'motif', 'created_at', 'annule_par_id']);
+  assert.equal(instance.db.pragma('foreign_key_list(mouvements_stock)').length, 3);
 });
 
 test('POST /api/articles crée un article et GET calcule un stock initial nul', async (t) => {

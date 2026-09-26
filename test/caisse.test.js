@@ -50,15 +50,12 @@ test('la table transactions_caisse est créée avec ses colonnes et ses contrain
 
   assert.deepEqual(instance.db.pragma('table_info(transactions_caisse)').map((c) => c.name), [
     'id', 'type', 'montant', 'mode_paiement', 'categorie', 'motif', 'chantier_id',
-    'date_transaction', 'created_at',
+    'date_transaction', 'created_at', 'annule_par_id',
   ]);
 
   const clesEtrangeres = instance.db.pragma('foreign_key_list(transactions_caisse)');
-  assert.equal(clesEtrangeres.length, 1);
-  assert.deepEqual(
-    [clesEtrangeres[0].table, clesEtrangeres[0].from, clesEtrangeres[0].to],
-    ['chantiers', 'chantier_id', 'id'],
-  );
+  assert.equal(clesEtrangeres.length, 2);
+  assert.equal(clesEtrangeres.some((cle) => cle.table === 'chantiers' && cle.from === 'chantier_id' && cle.to === 'id'), true);
 
   // Les contraintes CHECK tiennent au niveau de la base, pas seulement des routes.
   const insertion = instance.db.prepare(`

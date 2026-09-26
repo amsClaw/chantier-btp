@@ -21,10 +21,10 @@
   display: none !important;
 }
 html {
-  overflow-x: clip; /* aucun défilement horizontal, y compris sur 375 px */ -webkit-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 body {
-  margin: 0; overflow-x: clip;
+  margin: 0;
   padding-bottom: calc(var(--cible) + var(--espace-5) + env(safe-area-inset-bottom, 0px));
   background: var(--papier); color: var(--encre); font-family: var(--police); font-size: 16px;
   line-height: 1.45;
@@ -76,6 +76,7 @@ ul, fieldset {
 /* Contenu ----------------------------------------------------------------- */
 main {
   display: grid; gap: var(--espace-4); padding: var(--espace-4); max-width: 900px; margin: 0 auto;
+  overflow-x: clip; /* limite le débordement du contenu sans couper les couches globales */
 }
 .vue {
   display: grid; gap: var(--espace-4);

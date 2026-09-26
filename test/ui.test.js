@@ -102,9 +102,10 @@ test('le CSS livre des cibles tactiles de 44 px minimum', () => {
   const champs = blocCss(css, 'input, select, textarea');
   assert.match(champs, /min-height:\s*var\(--cible\)/, 'les champs et sélecteurs doivent faire 44 px');
 });
-test('le CSS empêche tout défilement horizontal sur 375 px', () => {
-  assert.match(blocCss(css, 'html'), /overflow-x:\s*clip/);
-  assert.match(blocCss(css, 'body'), /overflow-x:\s*clip/);
+test('le contenu évite le débordement horizontal sans couper les couches globales', () => {
+  assert.match(blocCss(css, 'main'), /overflow-x:\s*clip/);
+  assert.doesNotMatch(blocCss(css, 'html'), /overflow-x:\s*clip/);
+  assert.doesNotMatch(blocCss(css, 'body'), /overflow-x:\s*clip/);
   assert.doesNotMatch(css, /overflow-x:\s*hidden/);
   // Les grilles et le tableau de facture ne peuvent pas dépasser leur conteneur.
   assert.match(css, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);

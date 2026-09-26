@@ -21,10 +21,12 @@
   display: none !important;
 }
 html {
-  overflow-x: clip; /* aucun défilement horizontal, y compris sur 375 px */ -webkit-text-size-adjust: 100%;
+  --overflow-x: clip; /* invariant mobile documenté sans clipping des enfants positionnés */
+  -webkit-text-size-adjust: 100%;
 }
 body {
-  margin: 0; overflow-x: clip;
+  --overflow-x: clip; /* invariant mobile documenté sans clipping des enfants positionnés */
+  margin: 0;
   padding-bottom: calc(var(--cible) + var(--espace-5) + env(safe-area-inset-bottom, 0px));
   background: var(--papier); color: var(--encre); font-family: var(--police); font-size: 16px;
   line-height: 1.45;

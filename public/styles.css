@@ -128,8 +128,14 @@ main {
 .bouton--entree {
   background: var(--vert); border-color: var(--vert); color: #fff;
 }
+.bouton--entree:hover {
+  background: var(--vert); border-color: var(--vert);
+}
 .bouton--sortie {
   background: var(--rouge); border-color: var(--rouge); color: #fff;
+}
+.bouton--sortie:hover {
+  background: var(--rouge); border-color: var(--rouge);
 }
 .bouton--discret {
   background: transparent; border-style: dashed;

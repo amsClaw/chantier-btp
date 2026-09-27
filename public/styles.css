@@ -52,10 +52,6 @@ ul, fieldset {
   gap: var(--espace-1) var(--espace-3); padding: var(--espace-3) var(--espace-4);
   background: var(--papier-2); border-bottom: 1px solid var(--trait);
 }
-.bandeau__marque {
-  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--accent-fonce);
-}
 .bandeau__titre {
   font-size: 20px; flex: 1 1 auto;
 }

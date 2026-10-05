@@ -107,7 +107,13 @@ export function createStockRouter() {
     if (original.annule_par_id || db.prepare('SELECT id FROM mouvements_stock WHERE annule_par_id = ?').get(id)) {
       return res.status(400).json({ error: 'Ce mouvement est déjà annulé ou compensatoire' });
     }
-    const compensation = db.transaction(() => {
+    const annulation = db.transaction(() => {
+      if (original.type === 'entree') {
+        const stock = stockActuel(db, original.article_id);
+        if (original.quantite > stock) {
+          return { error: 'Stock insuffisant', stock_actuel: stock };
+        }
+      }
       const type = original.type === 'entree' ? 'sortie' : 'entree';
       const result = db.prepare(`INSERT INTO mouvements_stock
         (article_id, chantier_id, type, quantite, date_mouvement, motif, created_at)
@@ -117,9 +123,10 @@ export function createStockRouter() {
       const apres = db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(result.lastInsertRowid);
       db.prepare(`INSERT INTO historique_saisies (domaine, reference_id, action, motif, valeur_avant, valeur_apres, created_at)
         VALUES ('stock', ?, 'annulation', ?, ?, ?, ?)`).run(id, motif, JSON.stringify(original), JSON.stringify(apres), Date.now());
-      return result.lastInsertRowid;
+      return { id: result.lastInsertRowid };
     })();
-    res.status(201).json(db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(compensation));
+    if (annulation.error) return res.status(400).json(annulation);
+    res.status(201).json(db.prepare('SELECT * FROM mouvements_stock WHERE id = ?').get(annulation.id));
   });
 
   router.get('/chantiers/:id/consommations', (req, res) => {

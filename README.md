@@ -40,8 +40,10 @@ npm start       # démarre le serveur sur http://localhost:8080
 Puis ouvrir `http://<ip-du-poste>:8080` dans le navigateur du téléphone.
 La base est créée automatiquement au premier démarrage.
 
-> `npm run seed` **efface** le fichier SQLite désigné par `DB_PATH` avant de le
-> remplir : arrêtez le serveur (`Ctrl+C`) avant de le lancer sur une base en usage.
+> `npm run seed` **refuse** (code de sortie 1, base intacte) si le fichier SQLite
+> désigné par `DB_PATH` existe déjà. Pour le remplacer par la démonstration, confirmer
+> avec `npm run seed -- --force` (ou `SEED_FORCE=1`) après avoir arrêté le serveur
+> (`Ctrl+C`) ; toutes les saisies de cette base seront alors perdues.
 
 ## Variables d'environnement
 

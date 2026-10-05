@@ -15,11 +15,14 @@
  *
  * Base « propre » (contrairement à `npm start` qui complète une base existante) :
  * le fichier SQLite désigné par `DB_PATH` — ou par défaut `./data/chantier.sqlite` —
- * est supprimé avant le remplissage.
+ * est supprimé avant le remplissage. Garde-fou : si ce fichier existe déjà, le
+ * script refuse (code de sortie 1) sauf confirmation explicite par `--force` ou
+ * `SEED_FORCE=1`, pour ne pas écraser par erreur la base réelle de `npm start`.
  *
  * Usage :
  *   npm run seed
  *   DB_PATH=/tmp/demo.sqlite npm run seed
+ *   npm run seed -- --force        (ou SEED_FORCE=1 npm run seed)
  */
 
 import fs from 'node:fs';
@@ -230,14 +233,38 @@ function effacerBase(dbPath) {
   }
 }
 
+/** Levée quand la base existe déjà et qu'aucune confirmation n'a été donnée. */
+export class BaseExistanteError extends Error {
+  constructor(chemin) {
+    super(
+      `La base ${chemin} existe déjà : npm run seed l'effacerait (chantiers, caisse, factures).\n`
+        + 'Rien n\'a été modifié. Pour confirmer le remplacement par les données de démonstration :\n'
+        + '  npm run seed -- --force\n'
+        + '  (ou SEED_FORCE=1 npm run seed)\n'
+        + 'Pour une base de démonstration séparée : DB_PATH=/tmp/demo.sqlite npm run seed',
+    );
+    this.name = 'BaseExistanteError';
+    this.chemin = chemin;
+  }
+}
+
+/** Confirmation explicite d'écrasement : option `--force` ou `SEED_FORCE=1`. */
+export function forceDemande(argv = process.argv.slice(2), env = process.env) {
+  return argv.includes('--force') || env.SEED_FORCE === '1';
+}
+
 /**
  * Recrée la base `DB_PATH` et l'alimente. Renvoie `{ chemin, resume }`.
+ *
+ * Si le fichier existe déjà et que `force` est faux, lève `BaseExistanteError`
+ * sans rien toucher.
  *
  * Le serveur est démarré sur le port 0 (attribué par l'OS) : `npm run seed` ne
  * peut donc pas entrer en conflit avec un `npm start` déjà lancé.
  */
-export async function main({ dbPath = resolveDbPath() } = {}) {
+export async function main({ dbPath = resolveDbPath(), force = false } = {}) {
   const chemin = path.resolve(dbPath);
+  if (!force && fs.existsSync(chemin)) throw new BaseExistanteError(chemin);
   effacerBase(chemin);
 
   const instance = startServer({ port: 0, dbPath: chemin });
@@ -257,7 +284,7 @@ function estModulePrincipal() {
 }
 
 if (estModulePrincipal()) {
-  main()
+  main({ force: forceDemande() })
     .then(({ chemin, resume }) => {
       console.log(`\nBase de démonstration prête : ${chemin}`);
       console.log(`Devise affichée (CURRENCY_SYMBOL) : ${resolveCurrencySymbol()}`);
@@ -268,7 +295,8 @@ if (estModulePrincipal()) {
       console.log('\nPour consulter : npm start');
     })
     .catch((erreur) => {
-      console.error(`Échec du remplissage : ${erreur.message}`);
+      if (erreur instanceof BaseExistanteError) console.error(erreur.message);
+      else console.error(`Échec du remplissage : ${erreur.message}`);
       process.exitCode = 1;
     });
 }

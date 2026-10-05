@@ -13,10 +13,12 @@ const executer = promisify(execFile);
 const RACINE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Lance `npm run seed` dans un répertoire temporaire, sur le fichier SQLite demandé. */
-async function lancerSeed(dbPath) {
-  const { stdout } = await executer(process.execPath, ['scripts/seed.js'], {
+async function lancerSeed(dbPath, { force = false } = {}) {
+  const env = { ...process.env, DB_PATH: dbPath };
+  delete env.SEED_FORCE;
+  const { stdout } = await executer(process.execPath, ['scripts/seed.js', ...(force ? ['--force'] : [])], {
     cwd: RACINE,
-    env: { ...process.env, DB_PATH: dbPath },
+    env,
     timeout: 60000,
   });
   return stdout;
@@ -89,13 +91,66 @@ test('npm run seed repart d’une base propre : deux exécutions ne dupliquent r
 
   await lancerSeed(dbPath);
   const premier = compter(dbPath);
-  const secondeSortie = await lancerSeed(dbPath);
+  const secondeSortie = await lancerSeed(dbPath, { force: true });
   const second = compter(dbPath);
 
   assert.match(secondeSortie, /Base existante supprimée/);
   assert.deepEqual(second, premier);
   assert.equal(second.clients, 2);
   assert.equal(second.factures, 2);
+});
+
+test('base existante sans --force : refus (code 1), fichier intact', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chantier-btp-seed-refus-'));
+  const dbPath = path.join(dir, 'chantier.sqlite');
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  // Une « vraie » base avec une saisie qui n'appartient pas à la démonstration.
+  const db = openDatabase(dbPath);
+  db.prepare('INSERT INTO clients (nom, created_at) VALUES (?, ?)').run('Client réel à préserver', Date.now());
+  db.close();
+  const avant = fs.readFileSync(dbPath);
+
+  const env = { ...process.env, DB_PATH: dbPath };
+  delete env.SEED_FORCE;
+  await assert.rejects(
+    executer(process.execPath, ['scripts/seed.js'], { cwd: RACINE, env, timeout: 60000 }),
+    (erreur) => {
+      assert.equal(erreur.code, 1);
+      assert.ok(erreur.stderr.includes(dbPath), 'le message doit nommer la base protégée');
+      assert.match(erreur.stderr, /--force/);
+      assert.match(erreur.stderr, /SEED_FORCE=1/);
+      return true;
+    },
+  );
+
+  assert.ok(fs.readFileSync(dbPath).equals(avant), 'le fichier SQLite doit rester identique');
+  const verif = openDatabase(dbPath);
+  try {
+    assert.deepEqual(verif.prepare('SELECT nom FROM clients').all(), [{ nom: 'Client réel à préserver' }]);
+  } finally {
+    verif.close();
+  }
+});
+
+test('base existante + SEED_FORCE=1 : base recréée', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chantier-btp-seed-env-'));
+  const dbPath = path.join(dir, 'chantier.sqlite');
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const db = openDatabase(dbPath);
+  db.prepare('INSERT INTO clients (nom, created_at) VALUES (?, ?)').run('Ancien client', Date.now());
+  db.close();
+
+  const { stdout } = await executer(process.execPath, ['scripts/seed.js'], {
+    cwd: RACINE,
+    env: { ...process.env, DB_PATH: dbPath, SEED_FORCE: '1' },
+    timeout: 60000,
+  });
+  assert.match(stdout, /Base existante supprimée/);
+  const compteurs = compter(dbPath);
+  assert.equal(compteurs.clients, 2);
+  assert.equal(compteurs.factures, 2);
 });
 
 test('le seed respecte CURRENCY_SYMBOL (le règlement de démo suit la devise de l’instance)', async (t) => {

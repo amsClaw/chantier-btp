@@ -32,6 +32,62 @@ test('annulation stock crée une compensation, conserve l original et refuse la 
   assert.equal((await appel('/api/articles')).json[0].stock_actuel, 0);
 });
 
+test('une sortie annulée disparaît des consommations sans modifier les sorties actives', async (t) => {
+  const { instance, appel, chantier } = await contexte(); t.after(() => instance.close());
+  const ciment = await appel('/api/articles', 'POST', { nom: 'Ciment', unite: 'sac' });
+  const fer = await appel('/api/articles', 'POST', { nom: 'Fer', unite: 'barre' });
+  assert.equal(ciment.status, 201); assert.equal(fer.status, 201);
+  for (const article of [ciment.json, fer.json]) {
+    const entree = await appel('/api/stock/mouvements', 'POST', {
+      article_id: article.id, type: 'entree', quantite: 100, date_mouvement: '2026-09-25',
+    });
+    assert.equal(entree.status, 201);
+  }
+  for (const [articleId, quantite] of [[ciment.json.id, 80], [fer.json.id, 40]]) {
+    const sortie = await appel('/api/stock/mouvements', 'POST', {
+      article_id: articleId, type: 'sortie', quantite, chantier_id: chantier.id,
+      date_mouvement: '2026-09-26', motif: 'Dalle',
+    });
+    assert.equal(sortie.status, 201);
+  }
+  const chemin = `/api/chantiers/${chantier.id}/consommations`;
+  const actives = await appel(chemin);
+  assert.equal(actives.status, 200);
+  assert.deepEqual(actives.json.map(({ article_nom, quantite }) => ({ article_nom, quantite })),
+    [{ article_nom: 'Ciment', quantite: 80 }, { article_nom: 'Fer', quantite: 40 }]);
+  const sortie = await appel('/api/stock/mouvements', 'POST', {
+    article_id: fer.json.id, type: 'sortie', quantite: 20, chantier_id: chantier.id,
+    date_mouvement: '2026-09-27', motif: 'Erreur de chantier',
+  });
+  assert.equal(sortie.status, 201);
+  const avant = await appel(chemin);
+  assert.equal(avant.status, 200);
+  assert.deepEqual(avant.json.map((m) => m.id), [...actives.json.map((m) => m.id), sortie.json.id]);
+  assert.equal((await appel(`/api/stock/mouvements/${sortie.json.id}/annuler`, 'POST', { motif: 'Mauvais chantier' })).status, 201);
+  const apres = await appel(chemin);
+  assert.equal(apres.status, 200);
+  assert.deepEqual(apres.json, actives.json);
+});
+
+test('une entrée rattachée au chantier puis annulée ne crée aucune consommation compensatoire', async (t) => {
+  const { instance, appel, chantier } = await contexte(); t.after(() => instance.close());
+  const article = await appel('/api/articles', 'POST', { nom: 'Sable', unite: 'm3' });
+  assert.equal(article.status, 201);
+  const entree = await appel('/api/stock/mouvements', 'POST', {
+    article_id: article.json.id, type: 'entree', quantite: 8, chantier_id: chantier.id,
+    date_mouvement: '2026-09-25', motif: 'Livraison',
+  });
+  assert.equal(entree.status, 201);
+  const chemin = `/api/chantiers/${chantier.id}/consommations`;
+  const avant = await appel(chemin);
+  assert.equal(avant.status, 200); assert.deepEqual(avant.json, []);
+  const compensation = await appel(`/api/stock/mouvements/${entree.json.id}/annuler`, 'POST', { motif: 'Livraison refusée' });
+  assert.equal(compensation.status, 201);
+  assert.equal(compensation.json.type, 'sortie'); assert.equal(compensation.json.quantite, 8);
+  const apres = await appel(chemin);
+  assert.equal(apres.status, 200); assert.deepEqual(apres.json, []);
+});
+
 test('annulation caisse est auditée et les règlements de facture sont protégés', async (t) => {
   const { instance, appel, chantier } = await contexte(); t.after(() => instance.close());
   const operation = await appel('/api/caisse/transactions', 'POST', { type: 'sortie', montant: 50, mode_paiement: 'especes', categorie: 'divers', motif: 'Erreur', chantier_id: chantier.id });

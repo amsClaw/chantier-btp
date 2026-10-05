@@ -133,7 +133,10 @@ export function createStockRouter() {
       SELECT m.id, m.article_id, a.nom AS article_nom, a.unite, m.quantite,
              m.date_mouvement, m.motif, m.created_at, m.chantier_id
       FROM mouvements_stock m JOIN articles a ON a.id = m.article_id
-      WHERE m.chantier_id = ? AND m.type = 'sortie' ORDER BY m.id
+      WHERE m.chantier_id = ? AND m.type = 'sortie'
+        AND m.annule_par_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM mouvements_stock o WHERE o.annule_par_id = m.id)
+      ORDER BY m.id
     `).all(chantierId));
   });
 
